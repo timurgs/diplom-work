@@ -3,6 +3,7 @@ import pathlib
 import json
 from progressbar import ProgressBar
 import time
+import sys
 
 
 with open('token.txt', 'r') as file_object:
@@ -29,30 +30,33 @@ class VkBackup:
         }
 
     def get_photos(self):
+        default_albums = ['wall', 'profile']
         vk_id = input('Введите id своего профиля: ')
-        album_id = None
         album_name = input('Из какого альбома вы хотите сохранить фото, wall или profile? ')
-        if album_name == 'wall':
-            album_id = 'wall'
-        elif album_name == 'profile':
-            album_id = 'profile'
-        elif album_name == 'saved':
-            album_id = 'saved'
-        else:
+        if album_name not in default_albums:
             print('Такого альбома не существует!')
+            sys.exit()
         get_photos_url = self.url + 'photos.get'
         get_photos_params = {
             'owner_id': vk_id,
-            'album_id': album_id,
+            'album_id': album_name,
             'extended': '1'
         }
         response = requests.get(get_photos_url, params={**self.params, **get_photos_params})
-        if response.status_code == 200:
+        if response.status_code == 200 and 'error' in response.json() and\
+                response.json()['error']['error_msg'] == 'This profile is private':
+            print('Этот профиль запривачен!')
+            sys.exit()
+        elif len(response.json()["response"]["items"]) == 0:
+            print('Файлов нет!')
+            sys.exit()
+        elif response.status_code == 200:
             print('Получение файлов...')
             print(progress_bar(len(response.json()["response"]["items"])))
             print('----------------')
         else:
             print('Ошибка работы программы!')
+            sys.exit()
         return response
 
 
@@ -90,6 +94,7 @@ def file_writing(res):
             print(progress_bar(len(res["response"]["items"])))
         else:
             print('Ошибка работы программы!')
+            sys.exit()
 
 
 class YaUploader:
@@ -109,7 +114,16 @@ class YaUploader:
         upload_url = "https://cloud-api.yandex.net/v1/disk/resources/upload"
         headers = self.get_headers()
         params = {"path": disk_file_path, "overwrite": "true"}
-        response = requests.get(url=upload_url, headers=headers, params=params)
+        response = ''
+        while response == '':
+            try:
+                response = requests.get(url=upload_url, headers=headers, params=params)
+                break
+            except requests.exceptions.ConnectionError:
+                print('Соединение отклонено сервером')
+                print('Нужно подождать некоторое время...')
+                time.sleep(5)
+                print('Повторное соединение...')
         return response.json()
 
     def upload(self, href):
@@ -120,7 +134,8 @@ class YaUploader:
             print('Загрузка файла...')
             return progress_bar(1)
         else:
-            return 'Ошибка работы программы!'
+            print('Ошибка работы программы!')
+            sys.exit()
 
 
 if __name__ == '__main__':
