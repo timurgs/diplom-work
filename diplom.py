@@ -149,6 +149,6 @@ if __name__ == '__main__':
         with open('result.json', 'r') as f:
             text = json.load(f)
             j = j + 1
-            result_get_link = uploader.download_link(f'vk_photos/{text[j]["file_name"]}')
+            result_get_link = uploader.download_link(text[j]["file_name"])
             result = uploader.upload(result_get_link["href"])
             print(result)
